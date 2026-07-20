@@ -1,5 +1,9 @@
 # gecX — College Management & Campus Engagement Platform
 
+## Live: [gecx.dev](https://gecx.dev)
+
+### YouTube Tutorial: [Watch on YouTube](https://www.youtube.com/watch?v=GW8rWpjusWE)
+
 > A unified, role-based campus operating system that blends academic administration, community interaction, course learning, and competitive gamification into one modern Next.js application.
 
 ---
