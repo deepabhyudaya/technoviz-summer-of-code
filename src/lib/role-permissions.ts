@@ -1,0 +1,32 @@
+// Role permissions constants - can be imported by both server and client components
+// NOTE: This file does NOT have "use server" directive
+
+// ==================== PERMISSIONS BIT-FIELD ====================
+export const ROLE_PERMISSIONS = {
+  VIEW_CHANNELS: 1n << 0n,
+  SEND_MESSAGES: 1n << 1n,
+  MANAGE_MESSAGES: 1n << 2n,
+  KICK_MEMBERS: 1n << 3n,
+  BAN_MEMBERS: 1n << 4n,
+  MANAGE_ROLES: 1n << 5n,
+  MANAGE_CHANNELS: 1n << 6n,
+  ADMINISTRATOR: 1n << 7n,
+  MANAGE_SERVER: 1n << 8n,
+  MUTE_MEMBERS: 1n << 9n,
+  MANAGE_EMOJIS: 1n << 10n,
+  MENTION_EVERYONE: 1n << 11n,
+  VIEW_AUDIT_LOG: 1n << 12n,
+  CREATE_REACTION_ROLES: 1n << 13n,
+} as const;
+
+export const DEFAULT_ROLE_PERMISSIONS = {
+  ADMIN: Object.values(ROLE_PERMISSIONS).reduce((a, b) => a | b, 0n),
+  MODERATOR: ROLE_PERMISSIONS.VIEW_CHANNELS |
+             ROLE_PERMISSIONS.SEND_MESSAGES |
+             ROLE_PERMISSIONS.MANAGE_MESSAGES |
+             ROLE_PERMISSIONS.KICK_MEMBERS |
+             ROLE_PERMISSIONS.MUTE_MEMBERS |
+             ROLE_PERMISSIONS.MANAGE_EMOJIS |
+             ROLE_PERMISSIONS.CREATE_REACTION_ROLES,
+  MEMBER: ROLE_PERMISSIONS.VIEW_CHANNELS | ROLE_PERMISSIONS.SEND_MESSAGES,
+};
