@@ -1,0 +1,459 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Use dynamic viewport height on mobile to handle keyboard appearance */
+@supports (height: 100dvh) {
+  html, body {
+    height: 100dvh;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 223.8136 0.0000% 3.9388%;
+    --foreground: 223.8136 0.0004% 98.0256%;
+
+    --card: 223.8136 0.0000% 9.0527%;
+    --card-foreground: 223.8136 0.0004% 98.0256%;
+
+    --popover: 223.8136 0.0000% 14.9382%;
+    --popover-foreground: 223.8136 0.0004% 98.0256%;
+
+    --primary: 223.8136 0.0001% 89.8161%;
+    --primary-foreground: 223.8136 0.0000% 9.0527%;
+
+    --secondary: 223.8136 0.0000% 14.9382%;
+    --secondary-foreground: 223.8136 0.0004% 98.0256%;
+
+    --muted: 223.8136 0.0000% 14.9382%;
+    --muted-foreground: 223.8136 0.0000% 63.0163%;
+
+    --accent: 223.8136 0.0000% 25.0471%;
+    --accent-foreground: 223.8136 0.0004% 98.0256%;
+
+    --destructive: 358.7594 101.8439% 69.8357%;
+    --destructive-foreground: 223.8136 0.0004% 98.0256%;
+
+    --border: 223.8136 0.0000% 15.5096%;
+    --input: 223.8136 0.0000% 20.3885%;
+    --ring: 223.8136 0.0000% 45.1519%;
+
+    --radius: 0.625rem;
+
+    --sidebar-background: 223.8136 0.0000% 9.0527%;
+
+    --sidebar-foreground: 223.8136 0.0004% 98.0256%;
+
+    --sidebar-primary: 225.3451 84.0953% 48.9841%;
+
+    --sidebar-primary-foreground: 223.8136 0.0004% 98.0256%;
+
+    --sidebar-accent: 223.8136 0.0000% 14.9382%;
+
+    --sidebar-accent-foreground: 223.8136 0.0004% 98.0256%;
+
+    --sidebar-border: 223.8136 0.0000% 15.5096%;
+
+    --sidebar-ring: 223.8136 0.0000% 32.1993%;
+
+    --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+    --shadow-x: 0;
+    --shadow-y: 1px;
+    --shadow-blur: 3px;
+    --shadow-spread: 0px;
+    --shadow-opacity: 0.1;
+    --shadow-color: oklch(0 0 0);
+    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
+    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
+    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
+    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+
+    --chart-1: 211.7880 101.9718% 78.6759%;
+    --chart-2: 217.4076 91.3672% 59.5787%;
+    --chart-3: 221.4336 86.3731% 54.0624%;
+    --chart-4: 223.6587 78.7180% 47.8635%;
+    --chart-5: 226.5426 70.0108% 39.9224%;
+  }
+}
+
+:root {
+  --toastify-color-light: hsl(var(--background));
+  --toastify-color-dark: hsl(var(--background));
+  --toastify-text-color-light: hsl(var(--foreground));
+  --toastify-text-color-dark: hsl(var(--foreground));
+  --toastify-color-info: hsl(var(--primary));
+  --toastify-color-success: hsl(var(--primary));
+  --toastify-color-warning: hsl(var(--primary));
+  --toastify-color-error: hsl(var(--destructive));
+  --toastify-color-progress-light: hsl(var(--primary));
+  --toastify-color-progress-dark: hsl(var(--primary));
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ── Color-scheme sync ──────────────────────────────────────────────────────
+   Keeps native browser elements (scrollbars, inputs, date pickers) in sync
+   with the active theme. next-themes sets .dark or .light on <html>.       */
+:root {
+  color-scheme: dark; /* default — overridden by inline style on <html> when a custom theme is equipped */
+}
+.light {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
+
+/* Gradient themes write background-image to body */
+body[style*="background-image"] {
+  background-size: cover;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+
+.rbc-btn-group:first-child {
+  display: none !important;
+}
+
+.rbc-toolbar-label {
+  text-align: right !important;
+  padding: 0px 20px !important;
+}
+
+.rbc-btn-group:last-child {
+  font-size: 13px !important;
+}
+
+.rbc-btn-group:last-child button {
+  border: none !important;
+  margin-left: 2px !important;
+}
+
+.rbc-time-view {
+  border: none !important;
+}
+
+.rbc-time-header {
+  display: none !important;
+}
+
+.rbc-time-content {
+  border: none !important;
+}
+
+.rbc-time-gutter.rbc-time-column {
+  font-size: 12px !important;
+}
+
+.rbc-time-gutter.rbc-time-column .rbc-timeslot-group {
+  padding: 0px 20px !important;
+}
+
+.rbc-day-slot {
+  font-size: 14px !important;
+}
+
+.rbc-event {
+  border: none !important;
+  color: white !important;
+  padding: 10px !important;
+  margin: 10px !important;
+  width: 99% !important;
+}
+
+.rbc-event:nth-child(even) {
+  background-color: #404040 !important;
+}
+.rbc-event:nth-child(odd) {
+  background-color: #737373 !important;
+}
+
+.rbc-event-label {
+  color: rgba(255,255,255,0.75) !important;
+  margin-bottom: 5px;
+}
+
+.rbc-btn-group:last-child button {
+  background-color: #f1f0ff !important;
+  color: #374151 !important;
+}
+
+.rbc-toolbar button.rbc-active {
+  background-color: #dbdafe !important;
+  box-shadow: none !important;
+  color: #1e1b4b !important;
+}
+
+.rbc-timeslot-group {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+.rbc-time-gutter .rbc-timeslot-group {
+  background-color: #f8fafc !important;
+}
+
+.rbc-label {
+  color: #6b7280 !important;
+}
+
+.dark .rbc-btn-group:last-child button {
+  background-color: #111111 !important;
+  color: #d1d5db !important;
+}
+.dark .rbc-toolbar button.rbc-active {
+  background-color: #1a1a1a !important;
+  color: white !important;
+}
+.dark .rbc-time-view {
+  border: none !important;
+}
+.dark .rbc-timeslot-group {
+  background-color: #000000 !important;
+  border-color: transparent !important;
+}
+.dark .rbc-time-gutter .rbc-timeslot-group {
+  background-color: #000000 !important;
+}
+.dark .rbc-label {
+  color: #6b7280 !important;
+}
+.dark .rbc-day-slot .rbc-time-slot {
+  border-top: none !important;
+}
+.dark .rbc-event {
+  color: #e2e8f0 !important;
+}
+.dark .rbc-event:nth-child(even) { background-color: #d4d4d4 !important; }
+.dark .rbc-event:nth-child(odd) { background-color: #737373 !important; }
+
+.cloudinary-widget, iframe[src*="cloudinary"] {
+  pointer-events: auto !important;
+  z-index: 99999 !important;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.1);
+  border-radius: 10px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.2);
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.2);
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,0.1) transparent;
+}
+.dark .custom-scrollbar {
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+/* ── Password input normalization ─────────────────────────────────────────── */
+/* Kill browser-native password reveal icons across all engines */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input[type="text"]::-ms-reveal,
+input[type="text"]::-ms-clear {
+  display: none !important;
+}
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="text"]::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+}
+/* Chrome/Edge native password reveal lives inside a shadow container */
+input[type="password"]::-webkit-textfield-decoration-container,
+input[type="text"]::-webkit-textfield-decoration-container {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Password masking via CSS (Chrome/Edge) — used by InputField.tsx */
+.password-mask {
+  -webkit-text-security: disc;
+}
+.password-visible {
+  -webkit-text-security: none;
+}
+
+/* Override Chrome/Edge autofill colors so they match our theme */
+html body input:-webkit-autofill,
+html body input:-webkit-autofill:hover,
+html body input:-webkit-autofill:focus,
+html body input:-webkit-autofill:active {
+  -webkit-text-fill-color: hsl(var(--foreground)) !important;
+  -webkit-box-shadow: 0 0 0px 9999px hsl(var(--background)) inset !important;
+  box-shadow: 0 0 0px 9999px hsl(var(--background)) inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+  caret-color: hsl(var(--foreground)) !important;
+  filter: none !important;
+}
+
+/* Event theme: make panel backgrounds semi-transparent so background image shows through */
+
+/* Main layout containers */
+html[data-event-theme="active"] .bg-sidebar {
+  background-color: hsl(var(--sidebar-background) / var(--event-panel-opacity, 0.92)) !important;
+}
+html[data-event-theme="active"] .bg-background {
+  background-color: hsl(var(--background) / var(--event-panel-opacity, 0.92)) !important;
+}
+html[data-event-theme="active"] .bg-card {
+  background-color: hsl(var(--card) / calc(var(--event-panel-opacity, 0.92) + 0.03)) !important;
+}
+html[data-event-theme="active"] .bg-popover {
+  background-color: hsl(var(--popover) / calc(var(--event-panel-opacity, 0.92) + 0.03)) !important;
+}
+html[data-event-theme="active"] .bg-accent {
+  background-color: hsl(var(--accent) / calc(var(--event-panel-opacity, 0.92) + 0.03)) !important;
+}
+html[data-event-theme="active"] .bg-muted {
+  background-color: hsl(var(--muted) / calc(var(--event-panel-opacity, 0.92) + 0.03)) !important;
+}
+
+/* Prevent opacity compounding: nested bg-background / bg-sidebar inside another
+   bg-background / bg-sidebar become transparent. Only the outermost layer
+   contributes opacity, so the background image stays visible through chat UIs,
+   messages, tickets, server chat, etc.
+   NOTE: Dialogs/popovers in Radix portals are NOT inside .bg-background in the
+   DOM tree, so these rules do NOT affect them. */
+html[data-event-theme="active"] .bg-background .bg-background,
+html[data-event-theme="active"] .bg-sidebar .bg-sidebar,
+html[data-event-theme="active"] .bg-background .bg-sidebar,
+html[data-event-theme="active"] .bg-sidebar .bg-background {
+  background-color: transparent !important;
+}
+
+/* Preserve cards / popovers / accents / muted inside panels so they stay readable */
+html[data-event-theme="active"] .bg-background .bg-card,
+html[data-event-theme="active"] .bg-sidebar .bg-card,
+html[data-event-theme="active"] .bg-background .bg-popover,
+html[data-event-theme="active"] .bg-sidebar .bg-popover,
+html[data-event-theme="active"] .bg-background .bg-accent,
+html[data-event-theme="active"] .bg-sidebar .bg-accent,
+html[data-event-theme="active"] .bg-background .bg-muted,
+html[data-event-theme="active"] .bg-sidebar .bg-muted {
+  background-color: hsl(var(--card) / calc(var(--event-panel-opacity, 0.92) + 0.03)) !important;
+}
+
+/* Dialogs rendered in Radix portals need their own semi-transparent bg */
+html[data-event-theme="active"] [role="dialog"] .bg-background,
+html[data-event-theme="active"] [role="dialog"] .bg-card,
+html[data-event-theme="active"] [role="dialog"] .bg-popover,
+html[data-event-theme="active"] [data-radix-popper-content-wrapper] .bg-popover {
+  background-color: hsl(var(--popover) / calc(var(--event-panel-opacity, 0.92) + 0.05)) !important;
+}
+
+/* ===== BADGE SYSTEM ===== */
+.badge-row-container::-webkit-scrollbar {
+  display: none;
+}
+.badge-row-container {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes badge-gold-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(241, 196, 15, 0.4)); }
+  50% { filter: drop-shadow(0 0 6px rgba(241, 196, 15, 0.8)); }
+}
+
+.animate-gold-pulse {
+  animation: badge-gold-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Text shadow utility used by overlay labels */
+.text-shadow {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
