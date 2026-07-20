@@ -1,0 +1,2566 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id             String                  @id
+  username       String                  @unique
+  accessCode     String?                 @unique
+  notifications  Notification[]
+  badgeOverrides BadgeAdminOverrideLog[]
+  iconOverrides  BadgeIconOverride[]
+  badgesAdminSet UserBadge[]             @relation("AdminSetBadges")
+}
+
+model Announcement {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  date        DateTime
+  classId     Int?
+  class       Class?   @relation(fields: [classId], references: [id])
+
+  @@index([classId])
+  @@index([date])
+  @@index([classId, date])
+}
+
+model Assignment {
+  id        Int      @id @default(autoincrement())
+  title     String
+  startDate DateTime
+  dueDate   DateTime
+  lessonId  Int
+  lesson    Lesson   @relation(fields: [lessonId], references: [id])
+  results   Result[]
+  form      Form?
+
+  @@index([lessonId])
+  @@index([dueDate])
+}
+
+model Attendance {
+  id        Int      @id @default(autoincrement())
+  date      DateTime
+  present   Boolean
+  studentId String
+  lessonId  Int
+  lesson    Lesson   @relation(fields: [lessonId], references: [id])
+  student   Student  @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@index([lessonId])
+  @@index([date])
+  @@index([studentId, date])
+  @@index([lessonId, date])
+}
+
+model Class {
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  capacity      Int
+  supervisorId  String?
+  gradeId       Int
+  announcements Announcement[]
+  grade         Grade          @relation(fields: [gradeId], references: [id])
+  teacher       Teacher?       @relation(fields: [supervisorId], references: [id])
+  events        Event[]
+  lessons       Lesson[]
+  students      Student[]
+  rivalriesAsA  ClassRivalry[] @relation("RivalryClassA")
+  rivalriesAsB  ClassRivalry[] @relation("RivalryClassB")
+  classServerId String?        @unique
+  crPollId      Int?
+
+  // Season system: per-season point aggregates (branch wars).
+  branchSeasonPoints BranchSeasonPoints[]
+
+  // ===== College migration: branch metadata (additive, nullable) =====
+  branchCode     String? // e.g. "CSE", "ECE", "MECH", "BBA"
+  department     String? // e.g. "Computer Science & Engineering"
+  totalSemesters Int?     @default(8)
+  intakeCapacity Int? // supplemental to existing `capacity`
+  collegeId      String? // optional link to a College record
+  college        College? @relation(fields: [collegeId], references: [id])
+
+  @@index([branchCode])
+  @@index([collegeId])
+  @@index([gradeId])
+  @@index([supervisorId])
+}
+
+model Conversation {
+  id        Int             @id @default(autoincrement())
+  user1Id   String
+  user2Id   String
+  isClosed  Boolean         @default(false)
+  closedBy  String?
+  createdAt DateTime        @default(now())
+  messages  DirectMessage[] @relation("ConversationToDirectMessage")
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+}
+
+model Course {
+  id          Int                @id @default(autoincrement())
+  slug        String             @unique @default("")
+  title       String
+  description String
+  status      CourseStatus       @default(PENDING)
+  createdAt   DateTime           @default(now())
+  teacherId   String
+  teacher     Teacher            @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  enrollments CourseEnrollment[]
+  reviews     CourseReview[]
+  sections    CourseSection[]
+
+  @@index([teacherId])
+  @@index([status])
+}
+
+model CourseEnrollment {
+  id         Int      @id @default(autoincrement())
+  enrolledAt DateTime @default(now())
+  courseId   Int
+  studentId  String
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, studentId])
+}
+
+model CourseLecture {
+  id        Int              @id @default(autoincrement())
+  title     String
+  videoUrl  String
+  order     Int
+  sectionId Int
+  section   CourseSection    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  progress  CourseProgress[]
+
+  @@index([sectionId])
+}
+
+model CourseProgress {
+  id        Int           @id @default(autoincrement())
+  completed Boolean       @default(false)
+  lectureId Int
+  studentId String
+  lecture   CourseLecture @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  student   Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([lectureId, studentId])
+}
+
+model CourseReview {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  courseId  Int
+  studentId String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([studentId])
+}
+
+model CourseSection {
+  id       Int             @id @default(autoincrement())
+  title    String
+  order    Int
+  courseId Int
+  lectures CourseLecture[]
+  course   Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+}
+
+model DirectMessage {
+  id             Int                     @id @default(autoincrement())
+  content        String
+  messageType    String                  @default("TEXT")
+  commandKey     String?
+  commandLabel   String?
+  commandUrl     String?
+  createdAt      DateTime                @default(now())
+  senderId       String
+  conversationId Int
+  isRead         Boolean                 @default(false)
+  replyToId      Int?
+  conversation   Conversation            @relation("ConversationToDirectMessage", fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo        DirectMessage?          @relation("DirectMessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        DirectMessage[]         @relation("DirectMessageReply")
+  reactions      DirectMessageReaction[]
+  poll           Poll?
+
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@index([isRead])
+}
+
+model DirectMessageReaction {
+  id        Int           @id @default(autoincrement())
+  messageId Int
+  userId    String
+  emoji     String
+  message   DirectMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model UserBlock {
+  id        Int      @id @default(autoincrement())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+model Poll {
+  id              Int            @id @default(autoincrement())
+  question        String
+  createdAt       DateTime       @default(now())
+  directMessageId Int?           @unique
+  groupMessageId  Int?           @unique
+  serverMessageId String?        @unique
+  directMessage   DirectMessage? @relation(fields: [directMessageId], references: [id], onDelete: Cascade)
+  groupMessage    GroupMessage?  @relation(fields: [groupMessageId], references: [id], onDelete: Cascade)
+  serverMessage   ServerMessage? @relation(fields: [serverMessageId], references: [id], onDelete: Cascade)
+  options         PollOption[]
+  votes           PollVote[]
+}
+
+model PollOption {
+  id        Int        @id @default(autoincrement())
+  text      String
+  pollId    Int
+  studentId String?
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes     PollVote[]
+
+  @@index([pollId])
+}
+
+model PollVote {
+  id        Int        @id @default(autoincrement())
+  pollId    Int
+  optionId  Int
+  userId    String
+  createdAt DateTime   @default(now())
+  poll      Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  option    PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId])
+  @@index([optionId])
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  startTime   DateTime
+  endTime     DateTime
+  classId     Int?
+  class       Class?   @relation(fields: [classId], references: [id])
+
+  @@index([classId])
+  @@index([startTime])
+}
+
+model Exam {
+  id        Int      @id @default(autoincrement())
+  title     String
+  startTime DateTime
+  endTime   DateTime
+  lessonId  Int
+  lesson    Lesson   @relation(fields: [lessonId], references: [id])
+  results   Result[]
+  form      Form?
+
+  @@index([lessonId])
+  @@index([startTime])
+}
+
+model Grade {
+  id       Int       @id @default(autoincrement())
+  level    Int       @unique
+  classes  Class[]
+  students Student[]
+}
+
+model GroupChat {
+  id          Int            @id @default(autoincrement())
+  name        String
+  description String?
+  accessCode  String         @unique
+  bannerUrl   String? // Group banner URL (shop item unlock)
+  createdAt   DateTime       @default(now())
+  createdById String
+  members     GroupMember[]
+  messages    GroupMessage[]
+}
+
+model GroupMember {
+  id          Int       @id @default(autoincrement())
+  userId      String
+  userRole    String
+  username    String
+  displayName String
+  isOwner     Boolean   @default(false)
+  joinedAt    DateTime  @default(now())
+  groupId     Int
+  lastReadAt  DateTime  @default(now())
+  isMuted     Boolean   @default(false)
+  group       GroupChat @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+}
+
+model GroupMessage {
+  id             Int                    @id @default(autoincrement())
+  content        String
+  messageType    String                 @default("TEXT")
+  commandKey     String?
+  commandLabel   String?
+  commandUrl     String?
+  createdAt      DateTime               @default(now())
+  senderId       String
+  senderUsername String
+  senderRole     String
+  groupId        Int
+  isRead         Boolean                @default(false)
+  replyToId      Int?
+  group          GroupChat              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  replyTo        GroupMessage?          @relation("GroupMessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        GroupMessage[]         @relation("GroupMessageReply")
+  reactions      GroupMessageReaction[]
+  poll           Poll?
+
+  @@index([groupId])
+  @@index([groupId, createdAt])
+  @@index([senderId])
+}
+
+model GroupMessageReaction {
+  id        Int          @id @default(autoincrement())
+  messageId Int
+  userId    String
+  emoji     String
+  message   GroupMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model Lesson {
+  id          Int          @id @default(autoincrement())
+  name        String
+  day         Day
+  startTime   DateTime
+  endTime     DateTime
+  subjectId   Int
+  classId     Int
+  teacherId   String
+  assignments Assignment[]
+  attendances Attendance[]
+  exams       Exam[]
+  class       Class        @relation(fields: [classId], references: [id])
+  subject     Subject      @relation(fields: [subjectId], references: [id])
+  teacher     Teacher      @relation(fields: [teacherId], references: [id])
+
+  @@index([subjectId])
+  @@index([classId])
+  @@index([teacherId])
+  @@index([day])
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  title     String
+  message   String
+  type      NotificationType @default(GENERIC)
+  entityId  String?
+  isRead    Boolean          @default(false)
+  isViewed  Boolean          @default(false)
+  changes   Json?
+  createdAt DateTime         @default(now())
+  studentId String?
+  parentId  String?
+  teacherId String?
+  adminId   String?
+  parent    Parent?          @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student   Student?         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher   Teacher?         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  admin     Admin?           @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, isRead])
+  @@index([studentId, isViewed])
+  @@index([teacherId, isRead])
+  @@index([teacherId, isViewed])
+  @@index([parentId, isRead])
+  @@index([parentId, isViewed])
+  @@index([adminId, isRead])
+  @@index([adminId, isViewed])
+  @@index([type])
+}
+
+model Parent {
+  id            String         @id
+  username      String         @unique
+  name          String
+  surname       String
+  email         String?        @unique
+  phone         String         @unique
+  address       String
+  createdAt     DateTime       @default(now())
+  accessCode    String?        @unique
+  notifications Notification[]
+  students      Student[]
+  tickets       Ticket[]
+}
+
+model ProfileAccess {
+  id        String   @id
+  userId    String
+  userType  String
+  code      String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model PublicTicket {
+  id              Int                   @id @default(autoincrement())
+  code            String                @unique
+  type            String
+  subject         String
+  description     String
+  status          TicketStatus          @default(OPEN)
+  createdAt       DateTime              @default(now())
+  submitterUserId String?
+  submitterRole   String?
+  desiredUsername String?
+  desiredRole     String?
+  contactEmail    String?
+  messages        PublicTicketMessage[]
+
+  @@index([submitterUserId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model PublicTicketMessage {
+  id           Int                           @id @default(autoincrement())
+  content      String
+  messageType  String                        @default("TEXT")
+  createdAt    DateTime                      @default(now())
+  isAdminReply Boolean                       @default(false)
+  senderId     String
+  senderRole   String
+  ticketId     Int
+  isRead       Boolean                       @default(false)
+  replyToId    Int?
+  ticket       PublicTicket                  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  replyTo      PublicTicketMessage?          @relation("PublicTicketMessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      PublicTicketMessage[]         @relation("PublicTicketMessageReply")
+  reactions    PublicTicketMessageReaction[]
+
+  @@index([ticketId])
+  @@index([ticketId, createdAt])
+  @@index([senderId])
+  @@index([isRead])
+  @@index([replyToId])
+}
+
+model PublicTicketMessageReaction {
+  id        Int                 @id @default(autoincrement())
+  messageId Int
+  userId    String
+  emoji     String
+  message   PublicTicketMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+}
+
+model Result {
+  id           Int         @id @default(autoincrement())
+  score        Int
+  examId       Int?
+  assignmentId Int?
+  studentId    String
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id])
+  exam         Exam?       @relation(fields: [examId], references: [id])
+  student      Student     @relation(fields: [studentId], references: [id])
+  formResponse FormResponse?
+
+  @@index([studentId])
+  @@index([examId])
+  @@index([assignmentId])
+}
+
+model Student {
+  id         String   @id
+  username   String   @unique
+  name       String
+  surname    String
+  email      String?  @unique
+  phone      String?  @unique
+  address    String
+  img        String?
+  bloodType  String
+  sex        UserSex
+  createdAt  DateTime @default(now())
+  parentId   String
+  classId    Int
+  gradeId    Int
+  birthday   DateTime
+  accessCode String?  @unique
+
+  // ===== College migration: student academic identity (additive, nullable) =====
+  rollNumber          String? // unique within college+branch+year (enforced at app layer until backfilled)
+  registrationNumber  String?  @unique // globally unique university-issued ID
+  admissionYear       Int?
+  currentSemester     Int?
+  program             String? // e.g. "B.Tech", "BCA", "MBA"
+  batch               String? // e.g. "2023-27"
+  section             String? // e.g. "A", "B"
+  hosteller           Boolean? // true = hosteller, false = day scholar
+  guardianName        String?
+  guardianPhone       String?
+  guardianRelation    String? // e.g. "Father", "Mother", "Guardian"
+  governmentId        String? // e.g. Aadhar / national ID
+  collegeRollNumber   String? // college-assigned roll number (e.g. 2501019)
+  reservationCategory String? // UR, SC, ST, OBC, EWS, BC-I, BC-II, etc.
+  collegeId           String?
+  college             College? @relation(fields: [collegeId], references: [id])
+
+  attendances        Attendance[]
+  enrollments        CourseEnrollment[]
+  progress           CourseProgress[]
+  reviews            CourseReview[]
+  notifications      Notification[]
+  results            Result[]
+  formResponses      FormResponse[]
+  class              Class                     @relation(fields: [classId], references: [id])
+  grade              Grade                     @relation(fields: [gradeId], references: [id])
+  parent             Parent                    @relation(fields: [parentId], references: [id])
+  tickets            Ticket[]
+  rivalriesA         StudentRivalry[]          @relation("StudentRivalryA")
+  rivalriesB         StudentRivalry[]          @relation("StudentRivalryB")
+  rivalryMemberships RivalryMember[]
+  badges             UserBadge[]
+  badgeOverrides     BadgeAdminOverrideLog[]
+  badgeHistory       LeaderboardTop10History[]
+  badgeCache         BadgeCache?
+
+  // Season system: per-season point aggregates + honor badge awards.
+  studentSeasonPoints StudentSeasonPoints[]
+  honorBadgeAwards    HonorBadgeAward[]
+
+  // Phase 2B: ally invitations back-relations.
+  alliesAsInviter StudentRivalryAlly[] @relation("AllyInviter")
+  alliesAsAlly    StudentRivalryAlly[] @relation("AllyStudent")
+
+  @@index([rollNumber])
+  @@index([registrationNumber])
+  @@index([collegeId])
+  @@index([parentId])
+  @@index([classId])
+  @@index([gradeId])
+  @@index([sex])
+}
+
+model Subject {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  lessons  Lesson[]
+  teachers Teacher[]
+}
+
+model AcademicSubject {
+  id        String          @id @default(uuid())
+  name      String          @unique
+  color     String          @default("#3B82F6") // Hex color for subject badge
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  questions CommunityPost[]
+}
+
+model Teacher {
+  id                  String               @id
+  username            String               @unique
+  name                String
+  surname             String
+  email               String?              @unique
+  phone               String?              @unique
+  address             String
+  img                 String?
+  bloodType           String
+  sex                 UserSex
+  createdAt           DateTime             @default(now())
+  birthday            DateTime
+  accessCode          String?              @unique
+  // ===== College migration: faculty academic identity =====
+  employeeId          String?              @unique
+  designation         String? // e.g. "Assistant Professor", "Professor", "HOD"
+  department          String?
+  qualification       String? // e.g. "PhD, M.Tech (CSE)"
+  experienceYears     Int?
+  joiningDate         DateTime?
+  collegeId           String?
+  college             College?             @relation(fields: [collegeId], references: [id], onDelete: SetNull)
+  classes             Class[]
+  courses             Course[]
+  lessons             Lesson[]
+  notifications       Notification[]
+  attendances         TeacherAttendance[]
+  tickets             Ticket[]
+  subjects            Subject[]
+  studentRivalryBouts StudentRivalryBout[]
+  branchRivalryBouts  RivalryBout[]        @relation("BranchBoutTeacher")
+
+  @@index([collegeId])
+}
+
+model TeacherAttendance {
+  id        Int      @id @default(autoincrement())
+  date      DateTime
+  present   Boolean
+  teacherId String
+  teacher   Teacher  @relation(fields: [teacherId], references: [id])
+
+  @@index([teacherId])
+  @@index([date])
+  @@index([teacherId, date])
+}
+
+model Ticket {
+  id          Int             @id @default(autoincrement())
+  subject     String
+  description String
+  status      TicketStatus    @default(OPEN)
+  category    String          @default("other")
+  createdAt   DateTime        @default(now())
+  studentId   String?
+  parentId    String?
+  teacherId   String?
+  parent      Parent?         @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student     Student?        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher     Teacher?        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  messages    TicketMessage[]
+
+  @@index([studentId])
+  @@index([parentId])
+  @@index([teacherId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model TicketMessage {
+  id          Int                     @id @default(autoincrement())
+  content     String
+  messageType String                  @default("TEXT")
+  isRead      Boolean                 @default(false)
+  createdAt   DateTime                @default(now())
+  ticketId    Int
+  senderId    String
+  senderRole  String
+  replyToId   Int?
+  ticket      Ticket                  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  replyTo     TicketMessage?          @relation("TicketMessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies     TicketMessage[]         @relation("TicketMessageReply")
+  reactions   TicketMessageReaction[]
+
+  @@index([ticketId])
+  @@index([ticketId, createdAt])
+  @@index([senderId])
+  @@index([isRead])
+  @@index([replyToId])
+}
+
+model TicketMessageReaction {
+  id        Int           @id @default(autoincrement())
+  messageId Int
+  userId    String
+  emoji     String
+  message   TicketMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+}
+
+enum CourseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum Day {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+}
+
+enum TicketStatus {
+  OPEN
+  RESOLVED
+  CLOSED
+}
+
+enum UserSex {
+  MALE
+  FEMALE
+}
+
+enum NotificationType {
+  GENERIC
+  TEACHER_CREATED
+  TEACHER_UPDATED
+  TEACHER_DELETED
+  STUDENT_CREATED
+  STUDENT_UPDATED
+  STUDENT_DELETED
+  PARENT_CREATED
+  PARENT_UPDATED
+  PARENT_DELETED
+  GRADE_CREATED
+  GRADE_UPDATED
+  GRADE_DELETED
+  CLASS_CREATED
+  CLASS_UPDATED
+  CLASS_DELETED
+  LESSON_CREATED
+  LESSON_UPDATED
+  LESSON_DELETED
+  COURSE_SUBMITTED
+  COURSE_APPROVED
+  COURSE_REJECTED
+  COURSE_EXPIRED
+  COURSE_UNEXPIRED
+  COURSE_UPDATED
+  COURSE_DELETED
+  COURSE_ENROLLMENT
+  EXAM_CREATED
+  EXAM_UPDATED
+  EXAM_DELETED
+  ASSIGNMENT_CREATED
+  ASSIGNMENT_UPDATED
+  ASSIGNMENT_DELETED
+  RESULT_POSTED
+  RESULT_UPDATED
+  RESULT_DELETED
+  EVENT_CREATED
+  EVENT_UPDATED
+  EVENT_DELETED
+  ANNOUNCEMENT_CREATED
+  ANNOUNCEMENT_UPDATED
+  ANNOUNCEMENT_DELETED
+  TICKET_CREATED
+  TICKET_UPDATED
+  TICKET_DELETED
+  COMMUNITY_POST_CREATED
+  COMMUNITY_POST_LIKED
+  COMMUNITY_POST_REPOSTED
+  COMMUNITY_COMMENT_CREATED
+  COMMUNITY_FOLLOWED
+  COMMUNITY_REPORT_CREATED
+  QUESTION_ANSWERED
+  ANSWER_MARKED_BEST
+  ANSWER_MARKED_HELPFUL
+  ANSWER_MARKED_PROMISING
+  SERVER_MESSAGE
+  SERVER_JOIN
+  SERVER_ROLE_CHANGED
+  SERVER_KICKED
+  SERVER_MUTED
+  FOLLOW_REQUEST_RECEIVED
+  FOLLOW_REQUEST_ACCEPTED
+  FOLLOW_REQUEST_DECLINED
+  DM_REQUEST_RECEIVED
+  DM_REQUEST_ACCEPTED
+  DM_REQUEST_DECLINED
+  DM_ACCESS_REVOKED
+  RIVALRY_PROPOSED
+  RIVALRY_ADMIN_APPROVED
+  RIVALRY_ADMIN_REJECTED
+  RIVALRY_CR_NEEDED
+  RIVALRY_ACTIVE
+  RIVALRY_CONCLUDED
+  RIVALRY_STRIKE_ISSUED
+  CR_ELECTION_STARTED
+  CR_ELECTED
+  STUDENT_WAR_PROPOSED
+  STUDENT_WAR_ADMIN_APPROVED
+  STUDENT_WAR_REJECTED
+  STUDENT_WAR_ACTIVE
+  STUDENT_WAR_CONCLUDED
+  STUDENT_WAR_STRIKE
+  STUDENT_WAR_RETRACTED
+  STUDENT_WAR_SURRENDERED
+  STUDENT_WAR_ALLY_INVITED
+  STUDENT_WAR_ALLY_ACCEPTED
+  STUDENT_WAR_ALLY_DECLINED
+  STUDENT_WAR_ALLY_REVOKED
+  STUDENT_WAR_BET_PLACED
+  STUDENT_WAR_BET_WON
+  STUDENT_WAR_BET_LOST
+  STUDENT_WAR_BET_REFUNDED
+  SEASON_CREATED
+  SEASON_STARTED
+  SEASON_CONCLUDING
+  SEASON_CONCLUDED
+  SEASON_RANK_UP
+  SEASON_CONQUEROR_GAINED
+  SEASON_CONQUEROR_LOST
+  SEASON_MULTIPLIER_ACTIVE
+  HONOR_BADGE_AWARDED
+}
+
+// ==================== COMMUNITY FEATURE MODELS ====================
+
+model CommunityPost {
+  id             String   @id @default(uuid())
+  content        String   @db.Text
+  authorId       String
+  authorType     String // student, teacher, parent, admin
+  authorName     String
+  authorImage    String?
+  isRepost       Boolean  @default(false)
+  originalPostId String?
+  repostCount    Int      @default(0)
+  likeCount      Int      @default(0)
+  commentCount   Int      @default(0)
+  isDeleted      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Academic Q&A fields
+  subjectId  String?
+  subject    AcademicSubject? @relation(fields: [subjectId], references: [id])
+  isAnswered Boolean          @default(false)
+
+  // Reels fields
+  postType     String   @default("POST") // "POST" (Academic) or "REEL" (BlackLines short video)
+  videoUrl     String?  // Cloudinary secure URL OR YouTube embed URL
+  thumbnailUrl String?  // Video thumbnail URL
+  orientation  String?  // "PORTRAIT" | "LANDSCAPE"
+  viewCount    Int      @default(0)
+
+  author       UserCommunityProfile @relation(fields: [authorId], references: [userId])
+  originalPost CommunityPost?       @relation("Repost", fields: [originalPostId], references: [id])
+  reposts      CommunityPost[]      @relation("Repost")
+  likes        CommunityPostLike[]
+  comments     CommunityComment[]
+  reports      CommunityReport[]
+
+  @@index([authorId])
+  @@index([createdAt])
+  @@index([originalPostId])
+  @@index([subjectId])
+  @@index([postType])
+}
+
+model CommunityComment {
+  id          String   @id @default(uuid())
+  content     String   @db.Text
+  authorId    String
+  authorType  String
+  authorName  String
+  authorImage String?
+  postId      String
+  parentId    String?
+  likeCount   Int      @default(0)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Academic Q&A helpful answer ranks: 1=Best, 2=Helpful, 3=Promising
+  helpfulRank  Int? // 1 = Best Answer (100 karma), 2 = Helpful Answer (50 karma), 3 = Promising Answer (25 karma)
+  karmaAwarded Int  @default(0)
+
+  post    CommunityPost          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent  CommunityComment?      @relation("CommentReplies", fields: [parentId], references: [id])
+  replies CommunityComment[]     @relation("CommentReplies")
+  likes   CommunityCommentLike[]
+
+  @@index([postId])
+  @@index([parentId])
+  @@index([authorId])
+  @@index([helpfulRank])
+}
+
+model CommunityFollow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  UserCommunityProfile @relation("Follows", fields: [followerId], references: [userId])
+  following UserCommunityProfile @relation("Followers", fields: [followingId], references: [userId])
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model UserCommunityProfile {
+  userId                String    @id
+  userType              String // student, teacher, parent, admin
+  username              String    @unique
+  displayName           String?
+  bio                   String?   @db.Text
+  avatar                String?
+  customAvatar          String? // Custom avatar URL (GIF/image) - requires shop item
+  bannerUrl             String? // Profile banner URL (GIF/image) - requires shop item
+  isPrivate             Boolean   @default(false)
+  requireFollowApproval Boolean   @default(false) // If true, follows need approval
+  showKarma             String    @default("everyone") // "nobody", "followers", "everyone"
+  showAcademicProfile   String    @default("nobody") // "nobody", "followers", "everyone"
+  karmaPoints           Int       @default(0)
+  postCount             Int       @default(0)
+  followerCount         Int       @default(0)
+  followingCount        Int       @default(0)
+  currentStreak         Int       @default(0)
+  longestStreak         Int       @default(0)
+  lastActiveDate        DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  posts                    CommunityPost[]
+  follows                  CommunityFollow[] @relation("Follows")
+  followers                CommunityFollow[] @relation("Followers")
+  karmaHistory             KarmaHistory[]
+  activityLogs             UserActivityLog[]
+  sentFollowRequests       FollowRequest[]   @relation("SentFollowRequests")
+  receivedFollowRequests   FollowRequest[]   @relation("ReceivedFollowRequests")
+  sentDMAccessRequests     DMAccessRequest[] @relation("SentDMAccessRequests")
+  receivedDMAccessRequests DMAccessRequest[] @relation("ReceivedDMAccessRequests")
+
+  @@index([username])
+}
+
+model KarmaHistory {
+  id          String   @id @default(uuid())
+  userId      String
+  date        DateTime @db.Date
+  year        Int
+  month       Int
+  day         Int
+  karmaEarned Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user UserCommunityProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([year, month])
+  @@index([date])
+}
+
+model UserActivityLog {
+  id           String   @id @default(uuid())
+  userId       String
+  date         DateTime @db.Date
+  year         Int
+  month        Int
+  day          Int
+  activityType String   @default("general") // "message", "post", "comment", "general"
+  createdAt    DateTime @default(now())
+
+  user UserCommunityProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
+
+model CommunityPostLike {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+}
+
+model CommunityCommentLike {
+  id        String   @id @default(uuid())
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  comment CommunityComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([userId])
+}
+
+model CommunityReport {
+  id          String       @id @default(uuid())
+  postId      String
+  reporterId  String
+  reason      String
+  description String?
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  resolvedAt  DateTime?
+  resolvedBy  String?
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([reporterId])
+  @@index([status])
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+// ==================== GECX TOKEN SYSTEM MODELS ====================
+
+model UserGecXBalance {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  userType    String // student, teacher, parent, admin
+  balance     Int      @default(0)
+  totalEarned Int      @default(0)
+  totalSpent  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AvatarShopItem {
+  id          String   @id @default(uuid())
+  style       String   @unique // dicebear style name (e.g., "adventurer", "avataaars")
+  name        String // display name
+  description String?
+  cost        Int // gecX cost
+  category    String // "basic", "standard", "premium" or custom
+  isActive    Boolean  @default(true)
+  previewSeed String   @default("Felix") // seed for preview image
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UserAvatar {
+  id          String   @id @default(uuid())
+  userId      String
+  style       String // dicebear style
+  seed        String // unique seed for this user's avatar variation
+  purchasedAt DateTime @default(now())
+  cost        Int // price paid
+
+  @@unique([userId, style, seed])
+  @@index([userId])
+}
+
+model UserEquippedAvatar {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  academicStyle  String? // equipped for academic profile
+  academicSeed   String? // specific variant seed
+  communityStyle String? // equipped for community profile
+  communitySeed  String? // specific variant seed
+  updatedAt      DateTime @updatedAt
+}
+
+model GecXTransaction {
+  id          String   @id @default(uuid())
+  userId      String
+  userType    String
+  amount      Int // positive for earn, negative for spend
+  type        String // "attendance", "result", "teacher_bonus", "parent_bonus", "purchase", "admin_grant"
+  description String?
+  relatedId   String? // studentId for teacher/parent bonuses
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model GecXSettings {
+  id                     String @id @default(uuid())
+  defaultStartingBalance Int    @default(0)
+
+  // Student earning rates
+  attendancePerDay      Int @default(1)
+  perfectAttendanceWeek Int @default(5)
+  resultAbove95         Int @default(25)
+  resultAbove90         Int @default(20)
+  resultAbove85         Int @default(15)
+  resultAbove80         Int @default(12)
+  resultAbove70         Int @default(8)
+  resultAbove60         Int @default(5)
+
+  // Teacher earning (percentage of students' earnings)
+  teacherAttendanceBonusPercent Int @default(10)
+  teacherResultBonusPercent     Int @default(10)
+
+  // Parent earning (percentage of children's earnings)
+  parentAttendanceBonusPercent Int @default(5)
+  parentResultBonusPercent     Int @default(5)
+
+  updatedAt DateTime @updatedAt
+}
+
+// ==================== KARMA SETTINGS MODEL ====================
+
+model KarmaSettings {
+  id                      String @id @default(uuid())
+  likeReceived            Int    @default(2)
+  commentCreated          Int    @default(1)
+  commentReceived         Int    @default(1)
+  postCreated             Int    @default(2)
+  repostReceived          Int    @default(10)
+  perfectAttendanceWeek   Int    @default(5)
+  attendancePerDay        Int    @default(1)
+  resultAbove95           Int    @default(25)
+  resultAbove90           Int    @default(20)
+  resultAbove85           Int    @default(15)
+  resultAbove80           Int    @default(12)
+  resultAbove70           Int    @default(8)
+  resultAbove60           Int    @default(5)
+  messageSent             Int    @default(2)
+  messageReactionReceived Int    @default(1)
+  serverBumpReceived      Int    @default(5)
+
+  // Academic Q&A answer karma
+  bestAnswerKarma      Int @default(100) // Rank 1: Best Answer
+  helpfulAnswerKarma   Int @default(50) // Rank 2: Helpful Answer
+  promisingAnswerKarma Int @default(25) // Rank 3: Promising Answer
+
+  updatedAt DateTime @updatedAt
+}
+
+// ==================== SERVER FEATURE MODELS ====================
+
+model Server {
+  id                String                    @id @default(uuid())
+  name              String
+  description       String?
+  icon              String?
+  iconUrl           String? // Custom icon URL (shop item unlock)
+  bannerUrl         String? // Banner URL (shop item unlock)
+  inviteCode        String                    @unique
+  isDiscoverable    Boolean                   @default(false)
+  bumps             Int                       @default(0)
+  lastBumpedAt      DateTime?
+  createdAt         DateTime                  @default(now())
+  createdById       String
+  members           ServerMember[]
+  channels          ServerChannel[]
+  channelCategories ServerChannelCategory[] // Channel category sections
+  emojis            ServerEmoji[]
+  stickers          ServerSticker[]
+  slotPurchases     ServerEmojiSlotPurchase[]
+  customRoles       ServerRole[] // New: custom roles
+  settings          ServerSettings? // New: server settings
+  reactionRoles     ReactionRole[] // New: reaction roles
+  bans              ServerBan[] // New: server bans
+
+  @@index([inviteCode])
+  @@index([isDiscoverable])
+  @@index([bumps])
+}
+
+model ServerEmoji {
+  id        String   @id @default(uuid())
+  serverId  String
+  name      String // used as :name: in messages
+  imageUrl  String
+  addedById String
+  createdAt DateTime @default(now())
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@unique([serverId, name])
+  @@index([serverId])
+}
+
+model ServerSticker {
+  id        String   @id @default(uuid())
+  serverId  String
+  name      String
+  imageUrl  String
+  addedById String
+  createdAt DateTime @default(now())
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@unique([serverId, name])
+  @@index([serverId])
+}
+
+model ServerEmojiSlotPurchase {
+  id                String   @id @default(uuid())
+  serverId          String
+  planType          String // "STARTER", "STANDARD", "PREMIUM"
+  emojiSlotsAdded   Int
+  stickerSlotsAdded Int
+  cost              Int
+  purchasedById     String
+  createdAt         DateTime @default(now())
+  server            Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@index([serverId])
+  @@index([purchasedById])
+}
+
+model ServerMember {
+  id          String             @id @default(uuid())
+  serverId    String
+  userId      String
+  role        LegacyServerRole   @default(MEMBER)
+  roles       ServerMemberRole[] // New: multiple custom roles
+  username    String
+  displayName String
+  joinedAt    DateTime           @default(now())
+  isMuted     Boolean            @default(false)
+  lastReadAt  DateTime           @default(now())
+  sortOrder   Int                @default(0) // Manual sort position within role groups
+  server      Server             @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@unique([serverId, userId])
+  @@index([userId])
+}
+
+enum LegacyServerRole {
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+model ServerChannel {
+  id          String                 @id @default(uuid())
+  serverId    String
+  categoryId  String? // Nullable - uncategorized channels
+  name        String
+  order       Int                    @default(0)
+  isPrivate   Boolean                @default(false) // If true, only specific roles can view
+  createdAt   DateTime               @default(now())
+  server      Server                 @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  category    ServerChannelCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  messages    ServerMessage[]
+  permissions ChannelPermission[] // Role-based visibility permissions
+
+  @@index([serverId])
+  @@index([categoryId])
+}
+
+// Channel categories - group channels into collapsible sections
+model ServerChannelCategory {
+  id        String          @id @default(uuid())
+  serverId  String
+  name      String
+  order     Int             @default(0)
+  createdAt DateTime        @default(now())
+  server    Server          @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  channels  ServerChannel[]
+
+  @@index([serverId])
+  @@index([order])
+}
+
+// Channel visibility permissions - which roles can view private channels
+model ChannelPermission {
+  id        String        @id @default(uuid())
+  channelId String
+  roleId    String // null means everyone can view (public channel)
+  channel   ServerChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  role      ServerRole    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, roleId])
+  @@index([channelId])
+  @@index([roleId])
+}
+
+model ServerMessage {
+  id             String                  @id @default(uuid())
+  content        String
+  messageType    String                  @default("TEXT")
+  commandKey     String?
+  commandLabel   String?
+  commandUrl     String?
+  createdAt      DateTime                @default(now())
+  senderId       String
+  senderUsername String
+  senderRole     String
+  channelId      String
+  replyToId      String?
+  isRead         Boolean                 @default(false)
+  channel        ServerChannel           @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  replyTo        ServerMessage?          @relation("ServerMessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        ServerMessage[]         @relation("ServerMessageReply")
+  reactions      ServerMessageReaction[]
+  poll           Poll? // Reuse existing Poll model
+
+  @@index([channelId])
+  @@index([channelId, createdAt])
+  @@index([createdAt])
+}
+
+model ServerMessageReaction {
+  id        String        @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String
+  message   ServerMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
+}
+
+// ==================== CUSTOM ROLES SYSTEM ====================
+
+model ServerRole {
+  id                 String              @id @default(uuid())
+  serverId           String
+  name               String
+  color              String? // Hex color code
+  iconUrl            String? // Custom role icon URL
+  position           Int // Role hierarchy position (higher = more powerful)
+  permissions        BigInt              @default(0) // Bit-field permissions
+  hoist              Boolean             @default(false) // Display separately in member list
+  mentionable        Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  server             Server              @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  members            ServerMemberRole[]
+  reactionRoles      ReactionRole[]
+  channelPermissions ChannelPermission[] // Which channels this role can view
+
+  @@index([serverId])
+  @@index([position])
+}
+
+model ServerMemberRole {
+  id         String       @id @default(uuid())
+  memberId   String
+  roleId     String
+  assignedAt DateTime     @default(now())
+  assignedBy String? // User ID who assigned the role
+  member     ServerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  role       ServerRole   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, roleId])
+  @@index([memberId])
+  @@index([roleId])
+}
+
+model ReactionRole {
+  id          String     @id @default(uuid())
+  serverId    String
+  channelId   String
+  messageId   String
+  emoji       String // Emoji or :emoji_name:
+  roleId      String
+  maxUses     Int? // Limit how many users can get this role
+  useCount    Int        @default(0)
+  createdAt   DateTime   @default(now())
+  createdById String
+  server      Server     @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  role        ServerRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@index([serverId])
+  @@index([channelId])
+  @@index([messageId])
+}
+
+model ServerSettings {
+  id                    String   @id @default(uuid())
+  serverId              String   @unique
+  memberSortOrder       String   @default("hierarchy_desc") // hierarchy_asc, hierarchy_desc, custom
+  showRoleBadges        Boolean  @default(true)
+  allowMemberReordering Boolean  @default(true)
+  updatedAt             DateTime @updatedAt
+  server                Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+}
+
+model ServerBan {
+  id         String   @id @default(uuid())
+  serverId   String
+  userId     String
+  reason     String?
+  bannedById String
+  bannedAt   DateTime @default(now())
+  server     Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@unique([serverId, userId])
+  @@index([serverId])
+  @@index([userId])
+}
+
+// ==================== USERNAME COLOR & PROFILE BG SHOP ====================
+
+model UsernameColorShopItem {
+  id         String   @id @default(uuid())
+  name       String // e.g., "Red - Light", "Blue - Neon"
+  colorValue String // hex or CSS color value
+  type       String // "username" | "profileBg"
+  shade      String // "light", "dark", "neon", "normal"
+  category   String // "red", "blue", "green", etc.
+  cost       Int
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  ownedBy             UserOwnedColor[]
+  equippedAsUsername  UserEquippedColors[] @relation("UsernameColor")
+  equippedAsProfileBg UserEquippedColors[] @relation("ProfileBgColor")
+  equippedAsTheme     UserEquippedColors[] @relation("Theme")
+  equippedAsNameplate UserEquippedColors[] @relation("Nameplate")
+
+  @@index([type])
+  @@index([category])
+}
+
+model UserOwnedColor {
+  id          String   @id @default(uuid())
+  userId      String
+  colorItemId String
+  purchasedAt DateTime @default(now())
+  cost        Int
+
+  colorItem UsernameColorShopItem @relation(fields: [colorItemId], references: [id])
+
+  @@unique([userId, colorItemId])
+  @@index([userId])
+}
+
+model UserEquippedColors {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  usernameColorId  String? // item ID from UsernameColorShopItem (null = use karma-based)
+  profileBgColorId String? // item ID from UsernameColorShopItem (null = use karma-based)
+  themeId          String? // item ID for full app theme
+  nameplateId      String? // item ID for nameplate background
+  updatedAt        DateTime @updatedAt
+
+  usernameColorItem  UsernameColorShopItem? @relation("UsernameColor", fields: [usernameColorId], references: [id])
+  profileBgColorItem UsernameColorShopItem? @relation("ProfileBgColor", fields: [profileBgColorId], references: [id])
+  themeItem          UsernameColorShopItem? @relation("Theme", fields: [themeId], references: [id])
+  nameplateItem      UsernameColorShopItem? @relation("Nameplate", fields: [nameplateId], references: [id])
+}
+
+model UserImpersonation {
+  id           String   @id @default(uuid())
+  userId       String   @unique // the user doing the impersonating
+  targetUserId String // the user being impersonated
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([targetUserId])
+}
+
+// ==================== FOLLOW REQUESTS & DM ACCESS ====================
+
+model FollowRequest {
+  id          String              @id @default(uuid())
+  requesterId String
+  targetId    String
+  status      FollowRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  requester UserCommunityProfile @relation("SentFollowRequests", fields: [requesterId], references: [userId], onDelete: Cascade)
+  target    UserCommunityProfile @relation("ReceivedFollowRequests", fields: [targetId], references: [userId], onDelete: Cascade)
+
+  @@unique([requesterId, targetId])
+  @@index([targetId])
+  @@index([status])
+}
+
+enum FollowRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+model DMAccessRequest {
+  id          String         @id @default(uuid())
+  requesterId String
+  targetId    String
+  status      DMAccessStatus @default(PENDING)
+  message     String?        @db.Text // Optional message with request
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  requester UserCommunityProfile @relation("SentDMAccessRequests", fields: [requesterId], references: [userId], onDelete: Cascade)
+  target    UserCommunityProfile @relation("ReceivedDMAccessRequests", fields: [targetId], references: [userId], onDelete: Cascade)
+
+  @@unique([requesterId, targetId])
+  @@index([targetId])
+  @@index([status])
+}
+
+enum DMAccessStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  REVOKED
+}
+
+model DMAccessGrant {
+  id        String   @id @default(uuid())
+  user1Id   String
+  user2Id   String
+  grantedAt DateTime @default(now())
+  grantedBy String // Who approved the request (userId)
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+}
+
+// ==================== GLOBAL EMOJI & STICKER SHOP ====================
+
+model GlobalEmoji {
+  id        String   @id @default(uuid())
+  name      String   @unique // :name: syntax identifier
+  imageUrl  String
+  packId    String // groups emojis into a purchasable pack (shopItemId reference)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  ownedBy UserOwnedGlobalEmoji[]
+
+  @@index([packId])
+}
+
+model GlobalSticker {
+  id        String   @id @default(uuid())
+  name      String   @unique // :name: syntax identifier
+  imageUrl  String
+  packId    String // groups stickers into a purchasable pack
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  ownedBy UserOwnedGlobalSticker[]
+
+  @@index([packId])
+}
+
+model UserOwnedGlobalEmoji {
+  id          String      @id @default(uuid())
+  userId      String
+  emojiId     String
+  purchasedAt DateTime    @default(now())
+  emoji       GlobalEmoji @relation(fields: [emojiId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, emojiId])
+  @@index([userId])
+}
+
+model UserOwnedGlobalSticker {
+  id          String        @id @default(uuid())
+  userId      String
+  stickerId   String
+  purchasedAt DateTime      @default(now())
+  sticker     GlobalSticker @relation(fields: [stickerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, stickerId])
+  @@index([userId])
+}
+
+// ==================== EVENT THEMES ====================
+
+model EventTheme {
+  id                   String   @id @default(uuid())
+  name                 String // e.g. "Diwali Celebration"
+  backgroundImage      String? // URL to full-width background image
+  bannerImage          String? // URL to banner background
+  bannerText           String? // Custom text on banner
+  bannerTextColor      String   @default("#ffffff")
+  bannerBgColor        String   @default("rgba(0,0,0,0.6)")
+  bannerOverlayOpacity Float    @default(0.4) // 0 = fully transparent overlay, 1 = fully opaque
+  panelBgOpacity       Float    @default(0.92) // Opacity for sidebar/main content panels (0-1)
+  greetingMessage      String? // Custom greeting shown in event dialog
+  greetingAuthorName   String? // Name of admin shown with greeting
+  themeVars            String   @db.Text // JSON string of CSS vars like current themes
+  isActive             Boolean  @default(false)
+  createdBy            String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  userStates UserEventThemeState[]
+
+  @@index([isActive])
+}
+
+model UserEventThemeState {
+  id                String    @id @default(uuid())
+  userId            String
+  eventThemeId      String
+  previousThemeId   String? // user's previously equipped themeId before event
+  dismissedAt       DateTime?
+  bannerDismissedAt DateTime? // user closed/hid the banner
+  revertedAt        DateTime?
+  createdAt         DateTime  @default(now())
+
+  eventTheme EventTheme @relation(fields: [eventThemeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventThemeId])
+  @@index([userId])
+  @@index([eventThemeId])
+}
+
+// ==================== CLASS RIVALRY FEATURE ====================
+
+model ClassRivalry {
+  id                  String        @id @default(uuid())
+  classAId            Int
+  classBId            Int
+  proposerId          String
+  status              RivalryStatus @default(PENDING_ADMIN)
+  season              String
+  proposalNote        String?
+  adminId             String?
+  adminReviewedAt     DateTime?
+  crAId               String?
+  crBId               String?
+  crAApproved         Boolean       @default(false)
+  crBApproved         Boolean       @default(false)
+  autoExpiresAt       DateTime
+  battlefieldServerId String?
+  classAScore         Float         @default(0)
+  classBScore         Float         @default(0)
+  winnerClassId       Int?
+  concludedAt         DateTime?
+  // Phase 2A: war server wiring (role + scoreboard + archive channel ids).
+  serverRoleCrAId        String?
+  serverRoleCrBId        String?
+  serverRoleWarriorAId   String?
+  serverRoleWarriorBId   String?
+  scoreboardChannelId    String?
+  scoreboardMessageId    String?
+  loreChannelId          String?
+  hallOfFameChannelId    String?
+  isArchived             Boolean   @default(false)
+  // Season system integration (additive, nullable).
+  seasonId                String?
+  seasonPointsDistributed Boolean   @default(false)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  classA       Class                    @relation("RivalryClassA", fields: [classAId], references: [id])
+  classB       Class                    @relation("RivalryClassB", fields: [classBId], references: [id])
+  bouts        RivalryBout[]
+  members      RivalryMember[]
+  strikes      RivalryStrike[]
+  loreEntries  RivalryLore[]
+  seasonRef    Season?                  @relation(fields: [seasonId], references: [id])
+  pointTxns    SeasonPointTransaction[]
+
+  @@index([classAId])
+  @@index([classBId])
+  @@index([status])
+  @@index([seasonId])
+}
+
+model RivalryBout {
+  id           String       @id @default(uuid())
+  rivalryId    String
+  round        Int
+  title        String
+  description  String?
+  classAPoints Float        @default(0)
+  classBPoints Float        @default(0)
+  winnerId     Int?
+  conductedAt  DateTime     @default(now())
+
+  // Phase 2A: per-bout war-type config (mirrors StudentRivalryBout shape).
+  warTypeId      String?
+  status         String    @default("COMPLETED") // PENDING | ACTIVE | COMPLETED | CONVERTED
+  teacherId      String?
+  teacherStatus  String? // NOMINATED | ACCEPTED | DECLINED
+  startTime      DateTime?
+  endTime        DateTime?
+  typeConfigData Json?
+  mvpStudentId   String? // populated by per-warrior point breakdown
+
+  rivalry ClassRivalry @relation(fields: [rivalryId], references: [id], onDelete: Cascade)
+  warType WarType?     @relation("BranchWarType", fields: [warTypeId], references: [id])
+  teacher Teacher?     @relation("BranchBoutTeacher", fields: [teacherId], references: [id])
+
+  @@index([rivalryId])
+  @@index([warTypeId])
+  @@index([teacherId])
+}
+
+model RivalryMember {
+  id                String       @id @default(uuid())
+  rivalryId         String
+  studentId         String
+  classId           Int
+  isActive          Boolean      @default(true)
+  isReserve         Boolean      @default(false)
+  pointsContributed Float        @default(0)
+  // Phase 2A: per-warrior performance metrics.
+  boutsWon          Int          @default(0)
+  boutsParticipated Int          @default(0)
+  isMvp             Boolean      @default(false) // set at conclude time
+  joinedAt          DateTime     @default(now())
+  rivalry           ClassRivalry @relation(fields: [rivalryId], references: [id], onDelete: Cascade)
+  student           Student      @relation(fields: [studentId], references: [id])
+
+  @@unique([rivalryId, studentId])
+  @@index([rivalryId])
+  @@index([studentId])
+}
+
+model RivalryStrike {
+  id         String       @id @default(uuid())
+  rivalryId  String
+  studentId  String
+  reason     String
+  issuedAt   DateTime     @default(now())
+  mutedUntil DateTime?
+  rivalry    ClassRivalry @relation(fields: [rivalryId], references: [id], onDelete: Cascade)
+
+  @@index([rivalryId])
+  @@index([studentId])
+}
+
+model RivalryLore {
+  id          String       @id @default(uuid())
+  rivalryId   String
+  weekNumber  Int
+  title       String
+  narrative   String       @db.Text
+  generatedAt DateTime     @default(now())
+  rivalry     ClassRivalry @relation(fields: [rivalryId], references: [id], onDelete: Cascade)
+
+  @@index([rivalryId])
+}
+
+// ==================== STUDENT RIVALRY (1v1 DUEL) FEATURE ====================
+
+model StudentRivalry {
+  id                  String        @id @default(uuid())
+  studentAId          String
+  studentBId          String
+  proposerId          String
+  status              RivalryStatus @default(PENDING_ADMIN)
+  season              String
+  proposalNote        String?
+  adminId             String?
+  adminReviewedAt     DateTime?
+  targetAccepted      Boolean       @default(false)
+  autoExpiresAt       DateTime
+  battlefieldServerId String?
+  studentAScore       Float         @default(0)
+  studentBScore       Float         @default(0)
+  winnerStudentId     String?
+  concludedAt         DateTime?
+  // SW-001: war type chosen at proposal time but deferred to acceptance.
+  pendingWarTypeId    String?
+  pendingTeacherId    String?
+  pendingIsAutoRandom Boolean       @default(false)
+  // Phase 2A: war server wiring.
+  serverRoleWarriorId   String?
+  serverRoleAllyAId     String?
+  serverRoleAllyBId     String?
+  scoreboardChannelId   String?
+  scoreboardMessageId   String?
+  loreChannelId         String?
+  isArchived            Boolean   @default(false)
+  // Phase 2B: spectator betting config (per-rivalry, admin-overridable).
+  bettingEnabled        Boolean   @default(true)
+  bettingHouseCutPct    Float     @default(0.05) // 5% house cut on payout pool
+  bettingClosesAt       DateTime? // null = closes when first bout starts (set by accept)
+  betsSettled           Boolean   @default(false)
+  // Season system integration (additive, nullable).
+  seasonId                String?
+  seasonPointsDistributed Boolean   @default(false)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  studentA     Student                  @relation("StudentRivalryA", fields: [studentAId], references: [id])
+  studentB     Student                  @relation("StudentRivalryB", fields: [studentBId], references: [id])
+  bouts        StudentRivalryBout[]
+  strikes      StudentRivalryStrike[]
+  loreEntries  StudentRivalryLore[]
+  seasonRef    Season?                  @relation(fields: [seasonId], references: [id])
+  pointTxns    SeasonPointTransaction[]
+  allies       StudentRivalryAlly[]
+  spectatorBets SpectatorBet[]
+
+  @@index([studentAId])
+  @@index([studentBId])
+  @@index([status])
+  @@index([seasonId])
+}
+
+model WarType {
+  id                         String   @id @default(uuid())
+  name                       String   @unique // e.g., "KNOWLEDGE_DUEL"
+  description                String
+  requiresTeacher            Boolean
+  minDurationHours           Int
+  maxDurationHours           Int
+  isAvailableForStudentWar   Boolean  @default(true)
+  isAvailableForBranchWar    Boolean  @default(false)
+  probabilityWeightForRandom Int // e.g., 20
+  fallbackTypeId             String? // Self-relation for teacher decline
+  fallbackType               WarType? @relation("FallbackType", fields: [fallbackTypeId], references: [id])
+
+  fallbackFor  WarType[]            @relation("FallbackType")
+  studentBouts StudentRivalryBout[]
+  branchBouts  RivalryBout[]        @relation("BranchWarType")
+}
+
+model StudentRivalryBout {
+  id               String   @id @default(uuid())
+  studentRivalryId String
+  round            Int
+  title            String
+  description      String?
+  studentAPoints   Float    @default(0)
+  studentBPoints   Float    @default(0)
+  winnerId         String?
+  conductedAt      DateTime @default(now())
+
+  // --- WAR TYPE SYSTEM EXTENSIONS ---
+  warTypeId      String?
+  status         String    @default("PENDING") // PENDING, ACTIVE, COMPLETED, CONVERTED
+  teacherId      String?
+  teacherStatus  String? // NOMINATED, ACCEPTED, DECLINED
+  startTime      DateTime?
+  endTime        DateTime?
+  typeConfigData Json?
+
+  warType WarType? @relation(fields: [warTypeId], references: [id])
+  teacher Teacher? @relation(fields: [teacherId], references: [id])
+  // ----------------------------------
+
+  rivalry StudentRivalry @relation(fields: [studentRivalryId], references: [id], onDelete: Cascade)
+
+  @@index([studentRivalryId])
+  @@index([warTypeId])
+  @@index([teacherId])
+}
+
+model StudentRivalryStrike {
+  id               String         @id @default(uuid())
+  studentRivalryId String
+  studentId        String
+  reason           String
+  issuedAt         DateTime       @default(now())
+  mutedUntil       DateTime?
+  rivalry          StudentRivalry @relation(fields: [studentRivalryId], references: [id], onDelete: Cascade)
+
+  @@index([studentRivalryId])
+  @@index([studentId])
+}
+
+model StudentRivalryLore {
+  id               String         @id @default(uuid())
+  studentRivalryId String
+  weekNumber       Int
+  title            String
+  narrative        String         @db.Text
+  generatedAt      DateTime       @default(now())
+  rivalry          StudentRivalry @relation(fields: [studentRivalryId], references: [id], onDelete: Cascade)
+
+  @@index([studentRivalryId])
+}
+
+model ClassRepresentative {
+  id        String   @id @default(uuid())
+  classId   Int      @unique
+  studentId String
+  electedAt DateTime @default(now())
+  pollId    Int?
+  season    String
+  isActive  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+enum RivalryStatus {
+  PENDING_ADMIN
+  PENDING_CR
+  ACTIVE
+  CONCLUDED
+  REJECTED
+  EXPIRED
+}
+
+// ==================== COLLEGE (INSTITUTION) ====================
+// Top-level institution record. Admin can create one or more colleges.
+// All fields nullable for safe additive migration.
+model College {
+  id                       String   @id @default(uuid())
+  name                     String   @unique
+  shortName                String? // display abbreviation, e.g. "GEC"
+  universityName           String?
+  collegeCode              String?  @unique
+  establishmentYear        Int?
+  accreditation            String?
+  address                  String?
+  city                     String?
+  state                    String?
+  country                  String?
+  contactEmail             String?
+  contactPhone             String?
+  websiteUrl               String?
+  logoUrl                  String?
+  bannerUrl                String?
+  // Templates for auto-generating IDs (e.g. "{year}{branch_code}{sequence}")
+  rollNumberFormat         String?
+  registrationNumberFormat String?
+  isActive                 Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  branches Class[]
+  students Student[]
+  teachers Teacher[]
+  seasons  Season[]
+
+  @@index([collegeCode])
+}
+
+// ===== BADGE SYSTEM =====
+
+model UserBadge {
+  id               Int           @id @default(autoincrement())
+  userId           String
+  student          Student       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category         BadgeCategory
+  currentTier      Int? // 1-5
+  currentColor     BadgeColor?
+  achievementCount Int           @default(0)
+  firstEarnedAt    DateTime?
+  lastUpdatedAt    DateTime      @default(now()) @updatedAt
+  adminSet         Boolean       @default(false)
+  adminSetById     String?
+  adminSetBy       Admin?        @relation("AdminSetBadges", fields: [adminSetById], references: [id])
+  adminSetAt       DateTime?
+
+  @@unique([userId, category])
+  @@index([userId])
+  @@index([category])
+}
+
+model BadgeAdminOverrideLog {
+  id           Int               @id @default(autoincrement())
+  adminId      String
+  admin        Admin             @relation(fields: [adminId], references: [id])
+  studentId    String
+  student      Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  category     BadgeCategory? // Nullable for bulk/reset actions
+  oldTier      Int?
+  oldColor     BadgeColor?
+  newTier      Int?
+  newColor     BadgeColor?
+  reason       String?
+  overrideType BadgeOverrideType
+  createdAt    DateTime          @default(now())
+
+  @@index([studentId])
+  @@index([adminId])
+}
+
+model BadgeIconOverride {
+  id           Int           @id @default(autoincrement())
+  category     BadgeCategory
+  tierLevel    Int // 1-5
+  iconUrl      String? // S3 or local path to PNG
+  tintOverride String? // Custom hex override
+  uploadedById String
+  uploadedBy   Admin         @relation(fields: [uploadedById], references: [id])
+  uploadedAt   DateTime      @default(now())
+
+  @@unique([category, tierLevel])
+}
+
+model LeaderboardTop10History {
+  id               Int               @id @default(autoincrement())
+  userId           String
+  student          Student           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category         LeaderboardPeriod // ALL_TIME, MONTH, WEEK, TODAY
+  periodIdentifier String // e.g. "2025-W22", "2025-05"
+  rankAchieved     Int
+  recordedAt       DateTime          @default(now())
+
+  @@unique([userId, category, periodIdentifier])
+  @@index([userId])
+}
+
+model BadgeCache {
+  userId      String   @id
+  student     Student  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeJson   Json // Pre-computed array of badges for frontend rendering
+  computedAt  DateTime @default(now())
+  invalidated Boolean  @default(false)
+}
+
+enum BadgeCategory {
+  ATTENDANCE_STREAK
+  RESULTS_90
+  LEADERBOARD_ALL_TIME
+  LEADERBOARD_MONTH
+  LEADERBOARD_WEEK
+  LEADERBOARD_TODAY
+  COURSES_COMPLETED
+  VERIFIED_ANSWERS
+}
+
+enum BadgeColor {
+  PINK
+  PURPLE
+  GREEN
+  BLUE
+  GOLD
+}
+
+enum BadgeOverrideType {
+  SINGLE
+  BULK
+  RESET
+}
+
+enum LeaderboardPeriod {
+  ALL_TIME
+  MONTH
+  WEEK
+  TODAY
+}
+
+// ==================== SEASON & RANK SYSTEM ====================
+// BGMI-style seasons (per-cycle, per-season) layered on top of branch + student wars.
+// All fields admin-configurable, all icons URL-based (mirrors custom-emoji UX).
+
+enum SeasonStatus {
+  UPCOMING
+  ACTIVE
+  CONCLUDING
+  CONCLUDED
+}
+
+enum SeasonType {
+  BRANCH
+  STUDENT
+  BOTH
+}
+
+enum SeasonPointRecipientType {
+  BRANCH
+  STUDENT
+}
+
+enum SeasonPointTransactionType {
+  WAR_WIN
+  WAR_LOSS
+  WAR_WIN_DOMINANT
+  WAR_PERFECT
+  WAR_ROUND_WIN
+  WAR_MVP
+  WAR_WARRIOR
+  WAR_WARRIOR_WIN
+  WAR_PARTICIPATION
+  WAR_SWEEP
+  WAR_UNDERDOG
+  WAR_ALLY_WIN
+  MULTIPLIER_BONUS
+  ADMIN_ADJUST
+}
+
+enum SeasonIconType {
+  SEASON_ICON
+  SEASON_BANNER
+  RANK_ICON
+}
+
+model Season {
+  id                    String       @id @default(uuid())
+  collegeId             String? // null = global / platform-wide
+  cycleNumber           Int
+  seasonNumber          Int
+  seasonCode            String // auto-generated, e.g. "C2S1"
+  displayName           String? // optional subtitle, e.g. "The Iron Age"
+  seasonType            SeasonType   @default(BOTH)
+  iconUrl               String?
+  bannerUrl             String?
+  status                SeasonStatus @default(UPCOMING)
+  startDate             DateTime
+  endDate               DateTime
+  concludingStartedAt   DateTime? // when admin triggered conclusion (48h wind-down begins)
+  conquerorSize         Int          @default(10)
+  pointMultiplierActive Boolean      @default(false)
+  pointMultiplierValue  Float        @default(1.0)
+  multiplierLabel       String? // e.g. "2x Weekend"
+  createdById           String
+  concludedById         String?
+  concludedAt           DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  college          College?                   @relation(fields: [collegeId], references: [id])
+  ranks            SeasonRank[]
+  branchPoints     BranchSeasonPoints[]
+  studentPoints    StudentSeasonPoints[]
+  transactions    SeasonPointTransaction[]
+  rewards         SeasonRewardsDistributed[]
+  pointConfig     SeasonPointConfig?
+  iconHistory     SeasonIconHistory[]
+  classRivalries  ClassRivalry[]
+  studentRivalries StudentRivalry[]
+  honorAwards     HonorBadgeAward[]
+
+  @@unique([collegeId, cycleNumber, seasonNumber, seasonType])
+  @@index([collegeId])
+  @@index([status])
+  @@index([seasonCode])
+}
+
+model SeasonRank {
+  id          String   @id @default(uuid())
+  seasonId    String
+  rankOrder   Int // 0 = bottom, increasing
+  rankName    String // fully custom, e.g. "Bronze", "Recruit", "Legend"
+  rankCode    String // auto: "rank_1", "rank_2", ...
+  minPoints   Int // threshold to enter this rank
+  iconUrl     String?
+  colorHex    String?
+  isConqueror Boolean  @default(false) // top-tier flag (only top-N qualify)
+  createdAt   DateTime @default(now())
+
+  season         Season                @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  branchHolders  BranchSeasonPoints[]
+  studentHolders StudentSeasonPoints[]
+  iconHistory    SeasonIconHistory[]
+
+  @@unique([seasonId, rankOrder])
+  @@unique([seasonId, rankCode])
+  @@index([seasonId])
+}
+
+model BranchSeasonPoints {
+  id               String   @id @default(uuid())
+  seasonId         String
+  classId          Int // class IS branch per current design
+  totalPoints      Int      @default(0)
+  currentRankId    String?
+  warsWon          Int      @default(0)
+  warsLost         Int      @default(0)
+  warsParticipated Int      @default(0)
+  isConqueror      Boolean  @default(false)
+  conquerorRank    Int? // 1..conquerorSize
+  lastUpdatedAt    DateTime @default(now()) @updatedAt
+
+  season Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  class  Class       @relation(fields: [classId], references: [id])
+  rank   SeasonRank? @relation(fields: [currentRankId], references: [id])
+
+  @@unique([seasonId, classId])
+  @@index([seasonId, totalPoints])
+  @@index([currentRankId])
+}
+
+model StudentSeasonPoints {
+  id               String   @id @default(uuid())
+  seasonId         String
+  studentId        String
+  totalPoints      Int      @default(0)
+  currentRankId    String?
+  warsWon          Int      @default(0)
+  warsLost         Int      @default(0)
+  warsParticipated Int      @default(0)
+  winRate          Float    @default(0)
+  isConqueror      Boolean  @default(false)
+  conquerorRank    Int?
+  lastUpdatedAt    DateTime @default(now()) @updatedAt
+
+  season  Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  student Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  rank    SeasonRank? @relation(fields: [currentRankId], references: [id])
+
+  @@unique([seasonId, studentId])
+  @@index([seasonId, totalPoints])
+  @@index([currentRankId])
+}
+
+model SeasonPointTransaction {
+  id                String                     @id @default(uuid())
+  seasonId          String
+  recipientType     SeasonPointRecipientType
+  recipientId       String // branch classId as string OR studentId
+  classRivalryId    String?
+  studentRivalryId  String?
+  pointsEarned      Int
+  transactionType   SeasonPointTransactionType
+  multiplierApplied Float                      @default(1.0)
+  note              String?
+  createdAt         DateTime                   @default(now())
+
+  season         Season          @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  classRivalry   ClassRivalry?   @relation(fields: [classRivalryId], references: [id], onDelete: SetNull)
+  studentRivalry StudentRivalry? @relation(fields: [studentRivalryId], references: [id], onDelete: SetNull)
+
+  @@index([seasonId, recipientType, recipientId])
+  @@index([classRivalryId])
+  @@index([studentRivalryId])
+}
+
+model SeasonRewardsDistributed {
+  id            String   @id @default(uuid())
+  seasonId      String
+  userId        String
+  rewardType    String // BADGE | GECX | RANK_BADGE
+  rewardValue   String // badge id OR gecx amount as string
+  distributedAt DateTime @default(now())
+
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonId, userId, rewardType, rewardValue])
+  @@index([seasonId])
+  @@index([userId])
+}
+
+// Fully admin-configurable point values per season. Anything not specified
+// falls back to its default below; nothing is hardcoded in app code.
+model SeasonPointConfig {
+  id       String @id @default(uuid())
+  seasonId String @unique
+
+  // ---- Branch war (collective branch) ----
+  branchWarWin         Int @default(150)
+  branchWarWinDominant Int @default(50) // bonus on top of branchWarWin
+  branchWarPerfect     Int @default(75) // bonus on top of branchWarWin
+  branchWarLoss        Int @default(25)
+  branchWarRoundWin    Int @default(30)
+  branchWarMvpBonus    Int @default(20)
+
+  // ---- Branch war (per-individual on a branch) ----
+  individualBranchWin       Int @default(50)
+  individualWarriorBonus    Int @default(30)
+  individualWarriorWinBonus Int @default(40)
+  individualMvpBonus        Int @default(60)
+  individualLoserTopScorer  Int @default(25)
+  individualParticipation   Int @default(10)
+
+  // ---- Student war (1v1) ----
+  studentWarWin      Int @default(100)
+  studentWarSweep    Int @default(50) // bonus for sweep
+  studentWarLoss     Int @default(15)
+  studentWarUnderdog Int @default(25) // bonus for beating higher-ranked
+  studentWarAllyWin  Int @default(20)
+
+  // GECX rewards per rank tier at season conclusion.
+  // Shape: { "<rankCode>": <gecxAmount>, ... } e.g. { "rank_1": 500, "rank_2": 250 }
+  gecxRewardsByRank Json?
+
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+}
+
+// Archive of every icon URL ever set on a Season or SeasonRank — old URLs are
+// never destroyed, only superseded. Same pattern as honor-badge icon history.
+model SeasonIconHistory {
+  id           String         @id @default(uuid())
+  seasonId     String
+  rankId       String?
+  iconType     SeasonIconType
+  iconUrl      String
+  uploadedById String
+  uploadedAt   DateTime       @default(now())
+  replacedAt   DateTime?
+  previousUrl  String?
+
+  season Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  rank   SeasonRank? @relation(fields: [rankId], references: [id], onDelete: SetNull)
+
+  @@index([seasonId])
+  @@index([rankId])
+}
+
+// ==================== HONOR BADGES (admin-customizable, Discord-style) ====================
+// Each badge is fully editable: name, description, category, tier, iconUrl (paste-URL
+// matching the custom-emoji UX), criteria JSON for the auto-award engine. Admins can
+// also add new badges from scratch and grant/revoke manually.
+
+enum HonorBadgeCategory {
+  SEASON_FINAL // awarded at season conclude (champion, conqueror, ranked, perfect)
+  WAR_PERFORMANCE // awarded per-war (MVP, first blood, underdog, sweep)
+  STREAK // win streaks, no-loss seasons
+  PARTICIPATION
+  SPECIAL // admin-granted, no auto rule
+}
+
+model HonorBadgeDefinition {
+  id            String             @id @default(uuid())
+  code          String             @unique // engine lookup key, e.g. "SEASON_CHAMPION_BRANCH"
+  name          String
+  description   String             @db.Text
+  category      HonorBadgeCategory @default(SPECIAL)
+  tier          Int                @default(1) // 1..5 for stylistic stacking
+  iconUrl       String?
+  colorHex      String?
+  criteria      Json? // free-form rules consumed by the award engine
+  isActive      Boolean            @default(true)
+  isAutoAwarded Boolean            @default(true)
+  createdById   String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  awards      HonorBadgeAward[]
+  iconHistory HonorBadgeIconHistory[]
+
+  @@index([category])
+  @@index([code])
+}
+
+model HonorBadgeAward {
+  id           String   @id @default(uuid())
+  badgeId      String
+  userId       String
+  seasonId     String?
+  awardedAt    DateTime @default(now())
+  awardedById  String? // admin id if manual; null = auto
+  evidence     Json? // war ids, ranks, scores at time of award
+  revokedAt    DateTime?
+  revokedById  String?
+  revokeReason String?
+
+  badge   HonorBadgeDefinition @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  season  Season?              @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  student Student              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([badgeId, userId, seasonId])
+  @@index([userId])
+  @@index([seasonId])
+  @@index([badgeId])
+}
+
+model HonorBadgeIconHistory {
+  id           String    @id @default(uuid())
+  badgeId      String
+  iconUrl      String
+  uploadedById String
+  uploadedAt   DateTime  @default(now())
+  replacedAt   DateTime?
+  previousUrl  String?
+
+  badge HonorBadgeDefinition @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@index([badgeId])
+}
+
+// ==================== STUDENT WAR ALLIES (Phase 2B) ====================
+// Each duelist may invite up to N allies (config app-side, default 2). Allies
+// are platform users (typically other students) who join the duel server, get
+// the Ally role, and share in winner-bonus GecX payouts. Allies do not
+// directly contribute to per-bout score but are visible in the war room.
+
+enum AllyStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  REVOKED // proposer cancelled before ally responded
+  REMOVED // ally was kicked by admin/proposer after acceptance
+}
+
+model StudentRivalryAlly {
+  id               String     @id @default(uuid())
+  studentRivalryId String
+  // Which side this ally is fighting for (the studentId of the duelist they joined).
+  sideStudentId    String
+  inviterId        String // typically equals sideStudentId; admin-invited allies are also possible
+  allyStudentId    String
+  status           AllyStatus @default(PENDING)
+  invitedAt        DateTime   @default(now())
+  respondedAt      DateTime?
+  removedAt        DateTime?
+  removedReason    String?
+  // Bonus settlement.
+  bonusGecxAwarded Int        @default(0) // populated at conclude time if on winning side
+
+  rivalry StudentRivalry @relation(fields: [studentRivalryId], references: [id], onDelete: Cascade)
+  inviter Student        @relation("AllyInviter", fields: [inviterId], references: [id])
+  ally    Student        @relation("AllyStudent", fields: [allyStudentId], references: [id])
+
+  // One person cannot be invited twice for the same rivalry.
+  @@unique([studentRivalryId, allyStudentId])
+  @@index([studentRivalryId])
+  @@index([sideStudentId])
+  @@index([allyStudentId])
+  @@index([status])
+}
+
+// ==================== SPECTATOR BETTING (Phase 2B) ====================
+// Any platform user (NOT the fighters or their accepted allies) may stake GecX
+// on a side before bets close. Settled at conclude time using a parimutuel
+// pool: each winner gets `stake + (stake/winnerPool) * loserPool * (1 - houseCut)`.
+// Draws refund all bets; surrenders settle normally on the winning side.
+
+enum BetStatus {
+  OPEN
+  SETTLED_WON
+  SETTLED_LOST
+  REFUNDED // draw or admin-refunded
+  CANCELLED // bettor cancelled before close
+}
+
+model SpectatorBet {
+  id               String    @id @default(uuid())
+  studentRivalryId String
+  bettorUserId     String
+  bettorUserType   String // student | teacher | parent | admin
+  // Which fighter the bettor is backing (must equal studentAId or studentBId).
+  sideStudentId    String
+  stakeGecx        Int
+  status           BetStatus @default(OPEN)
+  payoutGecx       Int       @default(0) // populated on settlement
+  placedAt         DateTime  @default(now())
+  settledAt        DateTime?
+  // Eligibility snapshot — recorded at place time so a later ally invite cannot
+  // retroactively invalidate a bet placed before they joined the war.
+  bettorWasFighter Boolean   @default(false) // sanity-check: should always be false
+  bettorWasAlly    Boolean   @default(false)
+
+  rivalry StudentRivalry @relation(fields: [studentRivalryId], references: [id], onDelete: Cascade)
+
+  @@index([studentRivalryId])
+  @@index([bettorUserId])
+  @@index([status])
+  @@index([sideStudentId])
+}
+
+// ==================== DYNAMIC FORMS SYSTEM ====================
+
+enum FormType {
+  GENERAL
+  EXAM
+  ASSIGNMENT
+}
+
+enum FormStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum QuestionType {
+  SHORT_TEXT
+  LONG_TEXT
+  SINGLE_CHOICE
+  MULTI_CHOICE
+  DROPDOWN
+  RATING
+  DATE
+}
+
+model Form {
+  id           String       @id @default(uuid())
+  title        String
+  description  String?      @db.Text
+  type         FormType     @default(GENERAL)
+  status       FormStatus   @default(DRAFT)
+  createdById  String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  
+  timeLimit    Int?         // Limit in minutes (applicable for EXAM/ASSIGNMENT)
+  dueDate      DateTime?    // Due date (optional, matches assignment due-date conventions)
+  allowMultiple Boolean     @default(false) // GENERAL only
+
+  examId       Int?         @unique
+  exam         Exam?        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  
+  assignmentId Int?         @unique
+  assignment   Assignment?  @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  questions    FormQuestion[]
+  responses    FormResponse[]
+
+  @@index([createdById])
+  @@index([type])
+}
+
+model FormQuestion {
+  id          String         @id @default(uuid())
+  formId      String
+  form        Form           @relation(fields: [formId], references: [id], onDelete: Cascade)
+  type        QuestionType
+  title       String
+  description String?        @db.Text
+  isRequired  Boolean        @default(true)
+  order       Int            // Tracks visual ordering in dnd-kit
+  points      Int?           // Marks allocation for exams/assignments
+  
+  options     QuestionOption[]
+  answers     FormAnswer[]
+
+  @@index([formId])
+  @@index([order])
+}
+
+model QuestionOption {
+  id          String         @id @default(uuid())
+  questionId  String
+  question    FormQuestion   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text        String
+  isCorrect   Boolean        @default(false)
+  order       Int
+
+  @@index([questionId])
+}
+
+model FormResponse {
+  id           String         @id @default(uuid())
+  formId       String
+  form         Form           @relation(fields: [formId], references: [id], onDelete: Cascade)
+  studentId    String?        // Link to existing student profile
+  student      Student?       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  submittedById String        // User ID of submitter
+  submittedAt  DateTime       @default(now())
+  
+  score        Int?           // Overall score calculated or manually graded
+  isGraded     Boolean        @default(false)
+  
+  resultId     Int?           @unique
+  result       Result?        @relation(fields: [resultId], references: [id], onDelete: SetNull)
+
+  answers      FormAnswer[]
+
+  @@index([formId])
+  @@index([studentId])
+  @@index([submittedById])
+}
+
+model FormAnswer {
+  id           String         @id @default(uuid())
+  responseId   String
+  response     FormResponse   @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  questionId   String
+  question     FormQuestion   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  textResponse String?        @db.Text // Value for text, date, rating inputs
+  selectedOptionIds String[]  // Selected option IDs for multiple choice / checkbox answers
+
+  @@index([responseId])
+}
